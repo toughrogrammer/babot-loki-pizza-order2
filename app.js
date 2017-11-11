@@ -39,6 +39,32 @@ var recognizer = new builder.LuisRecognizer(LUIS_MODEL_URL);
 bot.recognizer(recognizer);
 
 
+// Create a custom prompt
+var luisPrompt = new builder.Prompt({ defaultRetryPrompt: "I'm sorry. I didn't recognize your search." })
+.onRecognize(function (context, callback) {
+    // Call prompts recognizer
+    recognizer.recognize(context, function (err, result) {
+        // If the intent returned isn't the 'None' intent return it
+        // as the prompts response.
+        if (result && result.intent !== 'None') {
+            callback(null, result.score, result);
+        } else {
+            callback(null, 0.0);
+        }
+    });
+});
+
+// Add your prompt as a dialog to your bot
+bot.dialog('LuisPrompt', luisPrompt);
+
+// Add function for calling your prompt from anywhere
+builder.Prompts.LuisPrompt = function (session, prompt, options) {
+    var args = options || {};
+    args.prompt = prompt || options.prompt;
+    session.beginDialog('LuisPrompt', args);
+}
+
+
 bot.dialog('Help', function (session) {
     session.endDialog("피자 주문을 도와드리겠습니다! 어떤 피자를 원하세요? \"치즈 피자 주문하겠습니다\"라고 말씀해주세요.");
 }).triggerAction({
@@ -56,27 +82,24 @@ bot.dialog('OrderPizza', [
         
         session.dialogData.pizzaType = pizzaTypeEntity.entity;
 
-        builder.Prompts.text(session, pizzaTypeEntity.entity + "를 주문합니다. 배달은 어디로 해드릴까요? \"땡땡떙으로 배달해주세요\"라고 말씀해주세요.");
+        builder.Prompts.LuisPrompt(session, pizzaTypeEntity.entity + "를 주문합니다. 배달은 어디로 해드릴까요? \"땡땡떙으로 배달해주세요\"라고 말씀해주세요.");
     },
     function (session, results) {
-        console.log("results : " + JSON.stringify(results));
+        var streetNameEntity = builder.EntityRecognizer.findEntity(results.response.entities, "StreetName");
+        var streetHouseNumberEntity = builder.EntityRecognizer.findEntity(results.response.entities, "StreetHouseNumber");
+        var houseInsideAddressEntity = builder.EntityRecognizer.findEntity(results.response.entities, "HouseInsideAddress");
 
-        builder.LuisRecognizer.recognize(results.response, LUIS_MODEL_URL, function (err, intents, entities) {
-            if (entities) {
-                var streetNameEntity = builder.EntityRecognizer.findEntity(entities, "StreetName");
-                var streetHouseNumberEntity = builder.EntityRecognizer.findEntity(entities, "StreetHouseNumber");
-                var houseInsideAddressEntity = builder.EntityRecognizer.findEntity(entities, "HouseInsideAddress");
+        session.dialogData.streetName = streetNameEntity.entity;
+        session.dialogData.streetHouseNumber = streetHouseNumberEntity.entity;
+        session.dialogData.houseInsideAddress = houseInsideAddressEntity.entity;
 
-                session.dialogData.streetNameEntity = streetNameEntity.entity;
-                session.dialogData.streetHouseNumberEntity = streetHouseNumberEntity.entity;
-                session.dialogData.houseInsideAddressEntity = houseInsideAddressEntity.entity;
-                builder.Prompts.text(session, streetNameEntity.entity + "길 " + streetHouseNumberEntity.entity + " " + houseInsideAddressEntity.entity + "로 배달해드리겠습니다. 결제는 어떻게 하시겠어요?");
-            }
-        });
+        builder.Prompts.LuisPrompt(session, streetNameEntity.entity + "길 " + streetHouseNumberEntity.entity + " " + houseInsideAddressEntity.entity + "로 배달해드리겠습니다. 결제는 어떻게 하시겠어요?");
     },
     function (session, results) {
-        session.dialogData.paymentMethod = results.response;
-        builder.Prompts.text(session, "\"" + results.response + "\"으로 결제하겠습니다.");
+        var paymentMethodEntity = builder.EntityRecognizer.findEntity(results.response.entities, "PaymentMethod");        
+        session.dialogData.paymentMethod = paymentMethodEntity.entity;
+
+        builder.Prompts.text(session, "\"" + paymentMethodEntity.entity + "\"으로 결제하겠습니다.");
     }
 ]).triggerAction({
     matches: 'OrderPizza',

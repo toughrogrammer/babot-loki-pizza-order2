@@ -38,6 +38,7 @@ var LUIS_MODEL_URL = "https://southeastasia.api.cognitive.microsoft.com/luis/v2.
 var recognizer = new builder.LuisRecognizer(LUIS_MODEL_URL);
 bot.recognizer(recognizer);
 
+
 bot.dialog('Help', function (session) {
     session.endDialog("피자 주문을 도와드리겠습니다! 어떤 피자를 원하세요? \"치즈 피자 주문하겠습니다\"라고 말씀해주세요.");
 }).triggerAction({
@@ -50,20 +51,28 @@ bot.dialog('OrderPizza', [
         var pizzaTypeEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'PizzaType');
         if (!pizzaTypeEntity) {
             builder.Prompts.text(session, '피자 종류를 말씀해주세요.');
+            return;
         }
         
         session.dialogData.pizzaType = pizzaTypeEntity.entity;
 
-        builder.Prompts.text(session, "배달은 어디로 해드릴까요?");
-        session.beginDialog('SetDestination');
+        builder.Prompts.text(session, pizzaTypeEntity.entity + "를 주문합니다. 배달은 어디로 해드릴까요? \"땡땡떙으로 배달해주세요\"라고 말씀해주세요.");
     },
     function (session, results) {
         console.log("results : " + JSON.stringify(results));
 
-        // results.response : 유저가 입력한 메세지
+        builder.LuisRecognizer.recognize(results.response, LUIS_MODEL_URL, function (err, intents, entities) {
+            if (entities) {
+                var streetNameEntity = builder.EntityRecognizer.findEntity(entities, "StreetName");
+                var streetHouseNumberEntity = builder.EntityRecognizer.findEntity(entities, "StreetHouseNumber");
+                var houseInsideAddressEntity = builder.EntityRecognizer.findEntity(entities, "HouseInsideAddress");
 
-        session.dialogData.destination = results.response;
-        builder.Prompts.text(session, "\"" + results.response + "\"으로 배달해드리겠습니다. 결제는 어떻게 하시겠어요?");
+                session.dialogData.streetNameEntity = streetNameEntity.entity;
+                session.dialogData.streetHouseNumberEntity = streetHouseNumberEntity.entity;
+                session.dialogData.houseInsideAddressEntity = houseInsideAddressEntity.entity;
+                builder.Prompts.text(session, streetNameEntity.entity + "길 " + streetHouseNumberEntity.entity + " " + houseInsideAddressEntity.entity + "로 배달해드리겠습니다. 결제는 어떻게 하시겠어요?");
+            }
+        });
     },
     function (session, results) {
         session.dialogData.paymentMethod = results.response;
@@ -72,19 +81,19 @@ bot.dialog('OrderPizza', [
 ]).triggerAction({
     matches: 'OrderPizza',
     onInterrupted: function (session) {
-        session.send('피자 종류를 선택해주세요.');
+        session.send('피자 주문을 이어서 해주세요.');
     }
 });
 
 
-bot.dialog('SetDestination', [
-    function (session, args, next) {
-        var destinationEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Destination');
-        session.endDialogWithResult({ destination: destinationEntity.entity });
-    }
-]).triggerAction({
-    matches: 'SetDestination',
-    onInterrupted: function (session) {
-        session.send('목적지를 말씀해주세요.');
-    }
-});
+// bot.dialog('RecognizeDestination', [
+//     function (session, args, next) {
+//         console.log("Here is RecognizeDestination");
+//         session.endDialog();
+//     }
+// ]).triggerAction({
+//     matches: 'RecognizeDestination',
+//     onInterrupted: function (session) {
+//         session.send('onInterrupted :: 목적지를 말씀해주세요.');
+//     }
+// });

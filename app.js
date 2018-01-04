@@ -107,16 +107,3 @@ bot.dialog('OrderPizza', [
         session.send('피자 주문을 이어서 해주세요.');
     }
 });
-
-
-// bot.dialog('RecognizeDestination', [
-//     function (session, args, next) {
-//         console.log("Here is RecognizeDestination");
-//         session.endDialog();
-//     }
-// ]).triggerAction({
-//     matches: 'RecognizeDestination',
-//     onInterrupted: function (session) {
-//         session.send('onInterrupted :: 목적지를 말씀해주세요.');
-//     }
-// });
